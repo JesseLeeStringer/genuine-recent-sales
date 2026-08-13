@@ -1,0 +1,73 @@
+/* Genuine — Recent Sales: front-end toast. All colours come from CSS vars set per the settings. */
+#grs-sp {
+	position: fixed;
+	bottom: 24px;
+	z-index: 99990;
+	width: 342px;
+	max-width: calc(100vw - 40px);
+	pointer-events: none;
+	font-family: var(--grs-font, inherit);
+}
+#grs-sp.grs-right { right: 24px; }
+#grs-sp.grs-left  { left: 24px; }
+
+#grs-sp .grs-t {
+	position: relative;
+	/* Only the VISIBLE card is clickable. A faded-out card keeps its box until the node is
+	   removed, and at opacity:0 it is an invisible click target pinned over the page — on a
+	   phone it spans the full width and swallows every tap on whatever sits underneath. */
+	pointer-events: none;
+	cursor: pointer;
+	background: var(--grs-bg, #FBF8F0);
+	color: var(--grs-text, #46413A);
+	border: 1px solid var(--grs-line, rgba(128,128,128,.28));
+	border-radius: var(--grs-radius, 9px);
+	padding: 13px 15px 12px;
+	box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 20px 42px -24px rgba(20,18,15,.6), 0 4px 12px -8px rgba(20,18,15,.35);
+	transform: translateY(16px);
+	opacity: 0;
+	transition: transform .5s cubic-bezier(.19,1,.22,1), opacity .45s ease, border-color .15s ease;
+}
+#grs-sp .grs-t.grs-show { transform: none; opacity: 1; pointer-events: auto; }
+#grs-sp .grs-t:hover { border-color: var(--grs-accent, #7E9469); }
+
+#grs-sp .grs-link { display: flex; gap: 12px; align-items: flex-start; text-decoration: none; color: inherit; outline: none; }
+#grs-sp .grs-link:focus-visible { outline: 2px solid var(--grs-accent, #7E9469); outline-offset: 3px; border-radius: 6px; }
+#grs-sp .grs-t:hover .grs-p { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--grs-accent, #7E9469) 55%, transparent); text-underline-offset: 2px; }
+
+#grs-sp .grs-body { min-width: 0; flex: 1; }
+
+#grs-sp .grs-x {
+	position: absolute; top: 6px; right: 6px; width: 24px; height: 24px;
+	border: 0; background: none; cursor: pointer; padding: 0;
+	color: var(--grs-text, #46413A); opacity: .5; border-radius: 50%;
+	line-height: 1; font-size: 16px; display: flex; align-items: center; justify-content: center;
+}
+#grs-sp .grs-x:hover { opacity: 1; background: rgba(128,128,128,.14); }
+
+#grs-sp .grs-k { display: flex; align-items: center; gap: .4rem; font-weight: 600; font-size: .6rem; letter-spacing: .16em; text-transform: uppercase; color: var(--grs-accent, #7E9469); margin-bottom: .3rem; }
+#grs-sp .grs-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--grs-accent, #7E9469); box-shadow: 0 0 0 3px rgba(128,128,128,.16); flex: none; }
+#grs-sp .grs-badge { margin-left: auto; display: inline-flex; align-items: center; gap: .2rem; font-size: .58rem; letter-spacing: .02em; text-transform: none; font-weight: 600; color: var(--grs-accent, #7E9469); opacity: .95; }
+
+#grs-sp .grs-p { font-weight: 500; font-size: 1rem; line-height: 1.16; color: var(--grs-title, #211E18); padding-right: 16px; }
+#grs-sp .grs-p .grs-q { opacity: .55; font-weight: 600; }
+
+#grs-sp .grs-v { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .3rem; font-size: .8rem; font-weight: 500; color: var(--grs-text, #46413A); }
+#grs-sp .grs-vdot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(128,128,128,.35); flex: none; }
+#grs-sp .grs-sep { opacity: .4; }
+
+#grs-sp .grs-a { margin-top: .45rem; font-size: .72rem; color: var(--grs-text, #46413A); opacity: .78; }
+#grs-sp .grs-a .grs-who { opacity: 1; font-weight: 500; }
+
+/* Photo style */
+#grs-sp .grs-thumb { flex: none; width: 52px; height: 52px; border-radius: 6px; overflow: hidden; background: rgba(128,128,128,.12); border: 1px solid var(--grs-line, rgba(128,128,128,.28)); }
+#grs-sp .grs-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#grs-sp:not(.grs-has-photo) .grs-thumb { display: none; }
+
+@media (max-width: 600px) {
+	#grs-sp, #grs-sp.grs-left, #grs-sp.grs-right { left: 12px; right: 12px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+	#grs-sp .grs-t { transition: opacity .35s ease; }
+	#grs-sp .grs-t.grs-show { transform: none; }
+}

@@ -1,0 +1,22 @@
+/* Genuine — Recent Sales: admin settings */
+.grs-tagline { color: #646970; margin-top: -.4em; max-width: 60ch; }
+
+.grs-trust {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	flex-wrap: wrap;
+	padding: 12px 16px;
+	border-radius: 6px;
+	margin: 16px 0 6px;
+	border: 1px solid transparent;
+}
+.grs-trust strong { font-size: 13px; white-space: nowrap; }
+.grs-trust span { color: #50575e; flex: 1 1 260px; }
+.grs-trust.is-verified { background: #eef7ea; border-color: #a3c293; }
+.grs-trust.is-verified strong { color: #2c6b2f; }
+.grs-trust.is-custom { background: #fcf5e6; border-color: #e0c584; }
+.grs-trust.is-custom strong { color: #8a6d1a; }
+
+.grs-wrap h2.title { margin-top: 2em; padding-top: 1em; border-top: 1px solid #dcdcde; }
+.grs-wrap .form-table th { width: 240px; }

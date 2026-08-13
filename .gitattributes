@@ -1,0 +1,9 @@
+# Normalise to LF in the repo and on checkout, on every platform. WordPress installs are
+# overwhelmingly Linux, and a CRLF checkout changes byte counts on files that get deployed
+# and verified by checksum.
+* text=auto eol=lf
+
+# Keep release archives lean.
+/.gitattributes export-ignore
+/.gitignore     export-ignore
+/.github        export-ignore
