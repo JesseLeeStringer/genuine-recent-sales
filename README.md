@@ -36,7 +36,7 @@ Push any of these outside its limit and the badge auto-switches off, with a noti
 2. Activate it (requires WooCommerce, PHP 8.1+, WP 6.2+).
 3. **WooCommerce → Recent Sales**, configure, tick **Enable**.
 
-**Auto-updates:** drop [`plugin-update-checker`](https://github.com/YahnisElsts/plugin-update-checker) into `lib/plugin-update-checker/` and updates flow from this repo's GitHub releases — no WordPress.org required.
+**Auto-updates work out of the box.** [`plugin-update-checker`](https://github.com/YahnisElsts/plugin-update-checker) (v5.7, MIT) is bundled in `lib/`, so new releases published here show up on your Plugins screen like any other update — no WordPress.org required.
 
 ## Privacy note for store owners
 
@@ -44,4 +44,4 @@ This displays real customers' first names and (optionally) their town/state publ
 
 ## License
 
-GPL-2.0-or-later.
+GPL-2.0-or-later. Bundles [plugin-update-checker](https://github.com/YahnisElsts/plugin-update-checker) v5.7 by Jānis Elsts under the MIT license (`lib/plugin-update-checker/license.txt`).

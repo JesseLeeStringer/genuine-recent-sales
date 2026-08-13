@@ -3,6 +3,9 @@
 # and verified by checksum.
 * text=auto eol=lf
 
+# Compiled translations are binary — never line-ending-normalise them.
+*.mo binary
+
 # Keep release archives lean.
 /.gitattributes export-ignore
 /.gitignore     export-ignore

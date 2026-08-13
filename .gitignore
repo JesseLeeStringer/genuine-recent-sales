@@ -1,5 +1,7 @@
-# Vendored at build/install time, not tracked — see README "Auto-updates".
-lib/
+# plugin-update-checker IS vendored and tracked, so a downloaded release auto-updates
+# out of the box. Anything else dropped into lib/ stays untracked.
+lib/*
+!lib/plugin-update-checker/
 
 # Build output
 *.zip
