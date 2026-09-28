@@ -85,11 +85,13 @@
 			Math.min( Math.max( r.bottom - 8, 1 ), window.innerHeight - 2 )
 		);
 		var start = el;
-		// The first opaque background below <body> decides (0.179 = the luminance where black and
-		// white text have equal contrast).
+		// The first opaque background of a page BAND (a section at least half the viewport wide) below
+		// <body> decides — not a product photo or card that happens to sit under the toast, which on a
+		// dark site would give a white toast. 0.179 = the luminance where black and white text have
+		// equal contrast.
 		for ( ; el && el !== document.body && el !== document.documentElement; el = el.parentElement ) {
 			var c = rgb( getComputedStyle( el ).backgroundColor );
-			if ( c && c[ 3 ] > 0.5 ) { return lum( c ) < 0.179; }
+			if ( c && c[ 3 ] > 0.5 && el.getBoundingClientRect().width >= window.innerWidth * 0.5 ) { return lum( c ) < 0.179; }
 		}
 		// Section painted with an image, or nothing opaque: light text there means a dark page.
 		if ( start ) {
