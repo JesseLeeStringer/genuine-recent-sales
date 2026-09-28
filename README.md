@@ -15,6 +15,7 @@ Most social-proof plugins let you *type in* fake notifications. This one refuses
 - **Collision-aware** — automatically lifts above common chat widgets, floating carts and back-to-top buttons.
 - **Considered cadence** — configurable delay, on-screen time, gap, per-session cap and dismiss memory. Click a toast to open the product; click × to dismiss.
 - **Cache-friendly & light** — proper enqueued assets, a cached REST feed, deferred, zero third-party JS. Excluded from cart, checkout and account pages automatically.
+- **Measurable** — optional Google Analytics 4 events for views, clicks and dismissals, sent to the GA4 property already on your site (see below).
 
 ## The "Genuine" guarantee
 
@@ -38,9 +39,40 @@ Push any of these outside its limit and the badge auto-switches off, with a noti
 
 **Auto-updates work out of the box.** [`plugin-update-checker`](https://github.com/YahnisElsts/plugin-update-checker) (v5.7, MIT) is bundled in `lib/`, so new releases published here show up on your Plugins screen like any other update — no WordPress.org required.
 
+## Google Analytics 4 events
+
+On by default. Switch it off at **WooCommerce → Recent Sales → Analytics**. The plugin loads no analytics of its own. It sends events when the page already runs GA4 through `gtag.js`, either way:
+- a `gtag('config', 'G-…')` tag, or
+- a Google tag (`GT-…`, as Site Kit adds) that loads a GA4 destination.
+
+It sends:
+
+| Event | Fires when | Parameters |
+| --- | --- | --- |
+| `grs_view` | a toast is actually painted on screen (never in a background tab) | `grs_product`, `grs_seq` |
+| `grs_click` | the toast is clicked through to the product (left or middle click) | `grs_product`, `grs_seq`, `link_url` |
+| `grs_dismiss` | the × is clicked | `grs_product`, `grs_seq` |
+
+- **Where events go:** each event is addressed with `send_to` to every GA4 (`G-`) destination on the page, so nothing goes to Google Ads or other gtag destinations.
+- **When a view counts:** only when the card is actually rendered — never in a background tab, and never while the hide-on-mobile rule has hidden it after a rotation.
+- **What `grs_seq` means:** the toast's position in the visitor's session (1, 2, 3…).
+- **What is never sent:** customer data — only the product name.
+- **Not sent** in admin preview mode, or when the page has no GA4 tag.
+- **Tag Manager-only sites** (no `gtag` function) get no events.
+- **Per-product reports:** register `grs_product` as an event-scoped custom dimension in GA4 (Admin → Custom definitions). Click-through rate = `grs_click` ÷ `grs_view`.
+
 ## Privacy note for store owners
 
 This displays real customers' first names and (optionally) their town/state publicly on your storefront, and serves them from a public REST endpoint (`/wp-json/grs/v1/feed`) — the same data the toast shows. Defaults are conservative (first name + town + state, paid orders, last 14 days). Choose "Initial only" and untick town/state if your jurisdiction or policies call for it. You are responsible for your own GDPR/CCPA compliance.
+
+## Changelog
+
+- **0.4.0** — Optional GA4 events (`grs_view` / `grs_click` / `grs_dismiss`), on by default. A view only counts once the toast is rendered.
+  - **Fixed — live sites ran in admin-preview cadence.** `wp_localize_script()` sends `0` as the string `"0"`, which JavaScript reads as true. Every enabled install was using the preview timing: first toast at 1.5 s, a 6.5 s gap, up to 24 per page, looping, with the per-session cap and the dismiss memory ignored.
+  - After updating, sites use their saved delay, gap, cap and dismiss settings, so **expect far fewer toasts per visit.**
+  - The *Hide on mobile* off-switch had the same bug and now works.
+- **0.3.0** — Bundles plugin-update-checker v5.7, so GitHub releases auto-update.
+- **0.2.0** — Initial public release. A faded toast no longer blocks clicks, and there is a *Hide on mobile* setting (client-side, cache-safe).
 
 ## License
 

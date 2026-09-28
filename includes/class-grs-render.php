@@ -80,9 +80,13 @@ class GRS_Render {
 			'interval'    => (int) $s['interval'] * 1000,
 			'cap'         => (int) $s['cap'],
 			'dismissDays' => (int) $s['dismiss_days'],
-			'preview'     => empty( $s['enabled'] ) ? 1 : 0,
-			'hideMobile'  => empty( $s['hide_mobile'] ) ? 0 : 1,
+			// Flags are booleans: wp_localize_script() casts every scalar to a string, so 0 would
+			// arrive as the truthy "0"; false arrives as "" and true as "1". toast.js reads them
+			// with flag(), which accepts true / 1 / "1" only.
+			'preview'     => empty( $s['enabled'] ),
+			'hideMobile'  => ! empty( $s['hide_mobile'] ),
 			'mobileBp'    => (int) $s['mobile_bp'],
+			'ga4'         => ! empty( $s['ga4_events'] ),
 		);
 	}
 

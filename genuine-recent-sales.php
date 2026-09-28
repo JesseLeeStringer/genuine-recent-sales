@@ -3,7 +3,7 @@
  * Plugin Name:       Genuine — Recent Sales for WooCommerce
  * Plugin URI:        https://github.com/JesseLeeStringer/genuine-recent-sales
  * Description:       Tasteful "recently purchased" notifications built from REAL WooCommerce orders — no fake data, ever. Three styles, full theming, privacy-safe, and a Verified badge you can only keep by playing it straight.
- * Version:           0.3.0
+ * Version:           0.4.0
  * Requires at least: 6.2
  * Requires PHP:      8.1
  * Requires Plugins:  woocommerce
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'GRS_VERSION', '0.3.0' );
+define( 'GRS_VERSION', '0.4.0' );
 define( 'GRS_FILE', __FILE__ );
 define( 'GRS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GRS_URL', plugin_dir_url( __FILE__ ) );
@@ -81,6 +81,11 @@ function grs_default_settings() {
 		// ── Data source ─────────────────────────────────────────────
 		'window_days'    => 14,                // only orders from the last N days
 		'statuses'       => array( 'completed', 'processing' ),
+
+		// ── Analytics ───────────────────────────────────────────────
+		'ga4_events'     => 1,                 // send grs_view / grs_click / grs_dismiss to the site's own
+		                                       // GA4 via gtag (product name only, never customer data).
+		                                       // No gtag or no GA4 config on the page = nothing is sent.
 	);
 }
 

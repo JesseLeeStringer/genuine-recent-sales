@@ -106,6 +106,8 @@ class GRS_Settings {
 			$out['statuses'] = $d['statuses'];
 		}
 
+		$out['ga4_events']     = empty( $in['ga4_events'] ) ? 0 : 1;
+
 		// The badge can never be "on" while the config is dishonest.
 		if ( $out['verified_badge'] && ! grs_is_verified( $out ) ) {
 			$out['verified_badge'] = 0;
@@ -223,6 +225,13 @@ class GRS_Settings {
 					$this->row_number( __( 'Only orders from the last (days)', 'genuine-recent-sales' ), "{$n}[window_days]", $s['window_days'], 1, 365, __( 'Over 30 days stops counting as "recent" and drops Genuine mode.', 'genuine-recent-sales' ) );
 					$this->row_statuses( $s );
 					$this->row_verified_badge( $s, $verified );
+					?>
+				</table>
+
+				<h2 class="title"><?php esc_html_e( 'Analytics', 'genuine-recent-sales' ); ?></h2>
+				<table class="form-table" role="presentation">
+					<?php
+					$this->row_checkbox( __( 'Google Analytics 4 events', 'genuine-recent-sales' ), "{$n}[ga4_events]", $s['ga4_events'], __( 'Send grs_view, grs_click and grs_dismiss events to the GA4 property already on your site (a gtag.js G- tag, or a Google tag such as Site Kit adds). Carries the product name only — never customer details. Does nothing if the page has no GA4 tag; Tag Manager-only setups are not supported.', 'genuine-recent-sales' ) );
 					?>
 				</table>
 
