@@ -7,9 +7,15 @@
 	max-width: calc(100vw - 40px);
 	pointer-events: none;
 	font-family: var(--grs-font, inherit);
+	/* Unitless, so a theme's fixed px line-height (e.g. 24px on 14px text) cannot leak in and inflate the card. */
+	line-height: 1.35;
 }
 #grs-sp.grs-right { right: 24px; }
 #grs-sp.grs-left  { left: 24px; }
+
+/* "Match page" (appearance = inherit): toast.js reads the background behind the toast and sets one of these. */
+#grs-sp.grs-on-light { --grs-bg: #ffffff; --grs-text: #4a4a52; --grs-title: #111114; --grs-line: rgba(0,0,0,.12); color-scheme: light; }
+#grs-sp.grs-on-dark  { --grs-bg: #1c1c21; --grs-text: #c9c9d1; --grs-title: #ffffff; --grs-line: rgba(255,255,255,.16); color-scheme: dark; }
 
 #grs-sp .grs-t {
 	position: relative;
@@ -17,22 +23,22 @@
 	   removed, and at opacity:0 it is an invisible click target pinned over the page — on a
 	   phone it spans the full width and swallows every tap on whatever sits underneath. */
 	pointer-events: none;
-	cursor: pointer;
 	background: var(--grs-bg, #FBF8F0);
 	color: var(--grs-text, #46413A);
 	border: 1px solid var(--grs-line, rgba(128,128,128,.28));
 	border-radius: var(--grs-radius, 9px);
-	padding: 13px 15px 12px;
 	box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 20px 42px -24px rgba(20,18,15,.6), 0 4px 12px -8px rgba(20,18,15,.35);
 	transform: translateY(16px);
 	opacity: 0;
 	transition: transform .5s cubic-bezier(.19,1,.22,1), opacity .45s ease, border-color .15s ease;
 }
+#grs-sp.grs-on-dark .grs-t { box-shadow: 0 20px 42px -24px rgba(0,0,0,.85), 0 4px 12px -8px rgba(0,0,0,.6); }
 #grs-sp .grs-t.grs-show { transform: none; opacity: 1; pointer-events: auto; }
 #grs-sp .grs-t:hover { border-color: var(--grs-accent, #7E9469); }
 
-#grs-sp .grs-link { display: flex; gap: 12px; align-items: flex-start; text-decoration: none; color: inherit; outline: none; }
-#grs-sp .grs-link:focus-visible { outline: 2px solid var(--grs-accent, #7E9469); outline-offset: 3px; border-radius: 6px; }
+/* The link fills the whole card (padding lives here), so every part of the card that looks clickable is. */
+#grs-sp .grs-link { display: flex; gap: 12px; align-items: flex-start; padding: 13px 15px 12px; text-decoration: none; color: inherit; outline: none; border-radius: var(--grs-radius, 9px); }
+#grs-sp a.grs-link { cursor: pointer; }
 #grs-sp .grs-t:hover .grs-p { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--grs-accent, #7E9469) 55%, transparent); text-underline-offset: 2px; }
 
 #grs-sp .grs-body { min-width: 0; flex: 1; }
@@ -40,24 +46,37 @@
 #grs-sp .grs-x {
 	position: absolute; top: 6px; right: 6px; width: 24px; height: 24px;
 	border: 0; background: none; cursor: pointer; padding: 0;
-	color: var(--grs-text, #46413A); opacity: .5; border-radius: 50%;
+	color: var(--grs-text, #46413A); opacity: .7; border-radius: 50%;
 	line-height: 1; font-size: 16px; display: flex; align-items: center; justify-content: center;
 }
-#grs-sp .grs-x:hover { opacity: 1; background: rgba(128,128,128,.14); }
+#grs-sp .grs-x:hover, #grs-sp .grs-x:focus-visible { opacity: 1; background: rgba(128,128,128,.14); }
 
-#grs-sp .grs-k { display: flex; align-items: center; gap: .4rem; font-weight: 600; font-size: .6rem; letter-spacing: .16em; text-transform: uppercase; color: var(--grs-accent, #7E9469); margin-bottom: .3rem; }
+/* Focus rings in the card's own title colour, so they keep contrast on any card — and win over theme
+   focus rules that are themselves !important (many themes style every a/button:focus-visible). */
+#grs-sp .grs-link:focus-visible,
+#grs-sp .grs-x:focus-visible { outline: 2px solid var(--grs-title, #211E18) !important; outline-offset: 2px !important; box-shadow: none !important; }
+
+/* Kicker text uses the text colour (small uppercase text in a mid-tone accent fails contrast); the accent
+   stays on the dot, the hover border and the swatches. */
+#grs-sp .grs-k { display: flex; align-items: center; gap: .4rem; font-weight: 600; font-size: .6rem; line-height: 1.2; letter-spacing: .16em; text-transform: uppercase; color: var(--grs-text, #46413A); margin-bottom: .3rem; }
 #grs-sp .grs-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--grs-accent, #7E9469); box-shadow: 0 0 0 3px rgba(128,128,128,.16); flex: none; }
-#grs-sp .grs-badge { margin-left: auto; display: inline-flex; align-items: center; gap: .2rem; font-size: .58rem; letter-spacing: .02em; text-transform: none; font-weight: 600; color: var(--grs-accent, #7E9469); opacity: .95; }
+#grs-sp .grs-badge { margin-left: auto; display: inline-flex; align-items: center; gap: .2rem; font-size: .58rem; letter-spacing: .02em; text-transform: none; font-weight: 600; color: var(--grs-title, #211E18); }
 
-#grs-sp .grs-p { font-weight: 500; font-size: 1rem; line-height: 1.16; color: var(--grs-title, #211E18); padding-right: 16px; }
-#grs-sp .grs-p .grs-q { opacity: .55; font-weight: 600; }
+/* Long product names stop at two lines (the full name is in the title attribute and the link text). */
+#grs-sp .grs-p {
+	font-weight: 500; font-size: 1rem; line-height: 1.2; color: var(--grs-title, #211E18); padding-right: 16px;
+	display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+#grs-sp .grs-p .grs-q { opacity: .7; font-weight: 600; }
 
 #grs-sp .grs-v { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-top: .3rem; font-size: .8rem; font-weight: 500; color: var(--grs-text, #46413A); }
 #grs-sp .grs-vdot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(128,128,128,.35); flex: none; }
-#grs-sp .grs-sep { opacity: .4; }
+#grs-sp .grs-sep { opacity: .5; }
 
-#grs-sp .grs-a { margin-top: .45rem; font-size: .72rem; color: var(--grs-text, #46413A); opacity: .78; }
-#grs-sp .grs-a .grs-who { opacity: 1; font-weight: 500; }
+/* One line: who · when. A very long town ends in an ellipsis instead of pushing "ago" onto a line of its own. */
+#grs-sp .grs-a { margin-top: .45rem; font-size: .72rem; line-height: 1.35; color: var(--grs-text, #46413A); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px; }
+#grs-sp .grs-a .grs-who { font-weight: 500; }
+#grs-sp .grs-ago { white-space: nowrap; }
 
 /* Photo style */
 #grs-sp .grs-thumb { flex: none; width: 52px; height: 52px; border-radius: 6px; overflow: hidden; background: rgba(128,128,128,.12); border: 1px solid var(--grs-line, rgba(128,128,128,.28)); }

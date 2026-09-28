@@ -8,6 +8,7 @@ jQuery( function ( $ ) {
 		var v = $mode.val();
 		$( '.grs-when-preset' ).toggle( v === 'preset' );
 		$( '.grs-when-custom' ).toggle( v === 'custom' );
+		$( '.grs-when-accent' ).toggle( v === 'custom' || v === 'inherit' ); // the accent applies in Match page too
 	}
 
 	$mode.on( 'change', sync );

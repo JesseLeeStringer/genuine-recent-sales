@@ -14,8 +14,12 @@
 	var VISIBLE = num( CFG.visible, 6000 ) || 6000;
 	var GAP     = PREVIEW ? 6500 : num( CFG.interval, 35000 );
 	var BP      = num( CFG.mobileBp, 600 ) || 600;
+	var AUTO    = CFG.appearance === 'inherit'; // "Match page": pick a light or dark card from what is behind it
+	var SIDE    = ( CFG.position === 'bottom-left' ) ? 'grs-left' : 'grs-right';
+	var RETRY   = 4000; // a spot that would cover a control is re-tried this often…
+	var RETRIES = 30;   // …for about two minutes per toast, then this page gives up
 
-	var shown = 0, stop = false, queue = [], qi = 0, root = null;
+	var shown = 0, stop = false, queue = [], qi = 0, root = null, retries = 0, lastFocus = null;
 
 	function esc( s ) {
 		return String( s == null ? '' : s ).replace( /[&<>"]/g, function ( m ) {
@@ -50,6 +54,92 @@
 		} catch ( e ) {}
 	}
 
+	// ── Hit-testing helpers ────────────────────────────────────────
+	// The topmost page element at a point, ignoring the toast itself.
+	function topAt( x, y ) {
+		var list = document.elementsFromPoint ? document.elementsFromPoint( x, y ) : [];
+		for ( var i = 0; i < list.length; i++ ) {
+			if ( list[ i ] !== root && ! root.contains( list[ i ] ) ) { return list[ i ]; }
+		}
+		return null;
+	}
+
+	// ── "Match page" (appearance = inherit) ──────────────────────
+	// System colours (Canvas/CanvasText) follow color-scheme, which most themes never set, so a
+	// dark site got a white card. Instead: read the opaque background actually behind the toast and
+	// switch between a light and a dark card (colours live in toast.css).
+	function rgb( s ) {
+		var m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%?))?/.exec( s || '' );
+		if ( ! m ) { return null; }
+		var a = m[ 4 ] === undefined ? 1 : parseFloat( m[ 4 ] ) / ( m[ 5 ] ? 100 : 1 );
+		return [ +m[ 1 ], +m[ 2 ], +m[ 3 ], a ];
+	}
+	function lum( c ) {
+		var f = function ( v ) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow( ( v + 0.055 ) / 1.055, 2.4 ); };
+		return 0.2126 * f( c[ 0 ] ) + 0.7152 * f( c[ 1 ] ) + 0.0722 * f( c[ 2 ] );
+	}
+	function pageIsDark() {
+		var r  = root.getBoundingClientRect();
+		var el = topAt(
+			Math.min( Math.max( r.left + r.width / 2, 1 ), window.innerWidth - 2 ),
+			Math.min( Math.max( r.bottom - 8, 1 ), window.innerHeight - 2 )
+		);
+		var start = el;
+		// The first opaque background below <body> decides (0.179 = the luminance where black and
+		// white text have equal contrast).
+		for ( ; el && el !== document.body && el !== document.documentElement; el = el.parentElement ) {
+			var c = rgb( getComputedStyle( el ).backgroundColor );
+			if ( c && c[ 3 ] > 0.5 ) { return lum( c ) < 0.179; }
+		}
+		// Section painted with an image, or nothing opaque: light text there means a dark page.
+		if ( start ) {
+			var t = rgb( getComputedStyle( start ).color );
+			if ( t && lum( t ) > 0.5 ) { return true; }
+		}
+		var b = rgb( getComputedStyle( document.body ).backgroundColor );
+		if ( ! b || b[ 3 ] <= 0.5 ) { b = rgb( getComputedStyle( document.documentElement ).backgroundColor ); }
+		return !! ( b && b[ 3 ] > 0.5 && lum( b ) < 0.179 );
+	}
+	function scheme() {
+		if ( ! AUTO || ! root ) { return; }
+		try {
+			var dark = pageIsDark();
+			root.classList.toggle( 'grs-on-dark', dark );
+			root.classList.toggle( 'grs-on-light', ! dark );
+		} catch ( e ) {}
+	}
+
+	// ── Keep clear of the page's controls ────────────────────────
+	// A toast must never sit over a button, a form control, a filter or a navigation link — at a
+	// laptop height a bottom corner is often exactly where a hero's call-to-action or a shop's filter
+	// sidebar lives. Ordinary text links and whole-card product links are fine to cover briefly.
+	var KEEP = 'button,input:not([type="hidden"]),select,textarea,summary,[role="button"],[role="checkbox"],[role="radio"],[role="tab"],[role="switch"],' +
+		'a.button,a[class*="button"],a[class*="btn"],.elementor-button,.wp-block-button__link,.add_to_cart_button,' +
+		'nav a,[role="navigation"] a,.woocommerce-widget-layered-nav a,[class*="filter"] a,[class*="facet"] a';
+	function coversControl() {
+		var box = root.getBoundingClientRect(); // the card's own transform does not move its container
+		if ( ! box.width || ! box.height ) { return false; }
+		var area = box.width * box.height, els;
+		try { els = document.querySelectorAll( KEEP ); } catch ( e ) { return false; }
+		for ( var i = 0; i < els.length; i++ ) {
+			var el = els[ i ];
+			if ( root.contains( el ) ) { continue; }
+			var r = el.getBoundingClientRect();
+			if ( r.width < 1 || r.height < 1 || r.width * r.height > area * 1.5 ) { continue; }
+			var ix = Math.min( r.right, box.right ) - Math.max( r.left, box.left );
+			var iy = Math.min( r.bottom, box.bottom ) - Math.max( r.top, box.top );
+			if ( ix < 6 || iy < 6 ) { continue; }
+			// Only count it if it is really on top there (not behind an overlay, not in a closed menu).
+			var top = topAt( Math.max( r.left, box.left ) + ix / 2, Math.max( r.top, box.top ) + iy / 2 );
+			if ( top && ( top === el || el.contains( top ) ) ) { return true; }
+		}
+		return false;
+	}
+	function setSide( side ) {
+		root.classList.remove( 'grs-left', 'grs-right' );
+		root.classList.add( side );
+	}
+
 	function line2( o ) {
 		if ( o.variants && o.variants.length ) {
 			var parts = o.variants.map( function ( x ) {
@@ -62,6 +152,8 @@
 		return '';
 	}
 
+	// Build the card and show it. Returns false (and shows nothing) when every corner it could use
+	// would cover one of the page's controls.
 	function render( o ) {
 		var seq   = shown + 1;
 		var badge = flag( CFG.badge ) ? '<span class="grs-badge">✓ ' + esc( CFG.badgeLabel ) + '</span>' : '';
@@ -69,9 +161,11 @@
 		var thumb = ( CFG.style === 'photo' && o.img ) ? '<span class="grs-thumb"><img src="' + esc( o.img ) + '" alt="" loading="lazy"></span>' : '';
 		var body  = '<div class="grs-body">' +
 			'<div class="grs-k"><span class="grs-dot"></span>' + esc( CFG.kicker ) + badge + '</div>' +
-			'<div class="grs-p"><span class="grs-q">' + ( parseInt( o.qty, 10 ) || 1 ) + '×</span> ' + esc( o.product ) + '</div>' +
+			'<div class="grs-p" title="' + esc( o.product ) + '"><span class="grs-q">' + ( parseInt( o.qty, 10 ) || 1 ) + '×</span> ' + esc( o.product ) + '</div>' +
 			line2( o ) +
-			'<div class="grs-a"><span class="grs-who">' + who + '</span>' + ( o.ago ? '<span class="grs-sep">·</span> ' + esc( o.ago ) : '' ) + '</div>' +
+			'<div class="grs-a"><span class="grs-who">' + who + '</span>' +
+				( o.ago ? ' <span class="grs-sep" aria-hidden="true">·</span> <span class="grs-ago">' + esc( o.ago ) + '</span>' : '' ) +
+			'</div>' +
 			'</div>';
 		var open  = o.url ? '<a class="grs-link" href="' + esc( o.url ) + '">' : '<div class="grs-link">';
 		var close = o.url ? '</a>' : '</div>';
@@ -81,20 +175,38 @@
 		t.innerHTML = open + thumb + body + close +
 			'<button class="grs-x" type="button" aria-label="' + esc( CFG.dismissAria ) + '">×</button>';
 
+		root.innerHTML = ''; root.appendChild( t );
+		setSide( SIDE ); place();
+		if ( coversControl() ) {
+			setSide( SIDE === 'grs-left' ? 'grs-right' : 'grs-left' ); place();
+			if ( coversControl() ) {
+				setSide( SIDE ); place();
+				root.removeChild( t );
+				return false;
+			}
+		}
+		scheme();
+
 		var a = t.querySelector( 'a.grs-link' );
 		if ( a ) {
 			a.addEventListener( 'click', function () { track( 'grs_click', o, seq, a.href ); } );
 			a.addEventListener( 'auxclick', function ( ev ) { if ( ev.button === 1 ) { track( 'grs_click', o, seq, a.href ); } } ); // middle-click / new tab
 		}
+		// Remember where keyboard focus came from, so a dismiss can hand it back.
+		t.addEventListener( 'focusin', function ( ev ) {
+			if ( ev.relatedTarget && ! t.contains( ev.relatedTarget ) ) { lastFocus = ev.relatedTarget; }
+		} );
 
 		t.querySelector( '.grs-x' ).addEventListener( 'click', function ( ev ) {
 			ev.preventDefault(); ev.stopPropagation();
 			if ( ! PREVIEW ) { try { localStorage.setItem( 'grs_dismissed', String( Date.now() ) ); } catch ( e ) {} }
 			track( 'grs_dismiss', o, seq );
+			if ( t.contains( document.activeElement ) ) {
+				if ( lastFocus && document.contains( lastFocus ) && lastFocus.focus ) { lastFocus.focus(); } else { document.activeElement.blur(); }
+			}
 			hide( t ); stop = true;
 		} );
 
-		root.innerHTML = ''; root.appendChild( t ); place();
 		// A view is counted only once the card is actually rendered: requestAnimationFrame never runs in
 		// a background tab, a card removed before its frame arrives is not counted, and a card inside a
 		// container the hide-on-mobile CSS has set to display:none (after a rotation or resize) has no
@@ -107,6 +219,7 @@
 		setTimeout( place, 1500 ); setTimeout( place, 4000 );
 		shown++;
 		if ( ! PREVIEW ) { try { sessionStorage.setItem( 'grs_shown', String( shown ) ); } catch ( e ) {} }
+		return true;
 	}
 
 	// Drop the class to fade out, then take the node OUT of the DOM once the transition ends.
@@ -120,6 +233,19 @@
 		}, 600 );
 	}
 
+	// Auto-hide after `ms` — but never while the pointer is over the card or it holds keyboard focus;
+	// check again shortly instead. Then wait the gap and move on to the next toast.
+	function hideLater( t, ms ) {
+		setTimeout( function () {
+			if ( ! t.parentNode || ! t.classList.contains( 'grs-show' ) && t.getAttribute( 'aria-hidden' ) === 'true' ) { return; } // dismissed
+			var hovered = false;
+			try { hovered = t.matches( ':hover' ); } catch ( e ) {}
+			if ( hovered || t.contains( document.activeElement ) ) { hideLater( t, 1500 ); return; }
+			hide( t );
+			setTimeout( function () { if ( ! stop ) { step(); } }, GAP );
+		}, ms );
+	}
+
 	// Narrow viewports: bail before anything is created or fetched. The CSS carries the same
 	// breakpoint, so a resize or rotation after load is covered too.
 	function hiddenOnMobile() {
@@ -131,11 +257,15 @@
 		if ( stop ) { return; }
 		if ( CAP > 0 && shown >= CAP ) { return; }
 		if ( qi >= queue.length ) { if ( PREVIEW ) { qi = 0; } else { return; } }
-		render( queue[ qi++ ] );
-		setTimeout( function () {
-			hide( root.querySelector( '.grs-t' ) );
-			setTimeout( function () { if ( ! stop ) { step(); } }, GAP );
-		}, VISIBLE );
+		if ( ! render( queue[ qi ] ) ) {
+			// Every corner would cover a control right now. Try again shortly — visitors scroll — without
+			// using up this toast or the session cap.
+			if ( ++retries <= RETRIES ) { setTimeout( step, RETRY ); }
+			return;
+		}
+		retries = 0;
+		qi++;
+		hideLater( root.querySelector( '.grs-t' ), VISIBLE );
 	}
 
 	// Sit clear of any known floating widget (chat / cart / back-to-top) sharing the toast's corner.
@@ -144,6 +274,7 @@
 		if ( ! root ) { return; }
 		var mobile = window.matchMedia( '(max-width:' + BP + 'px)' ).matches;
 		var lift = mobile ? 12 : 24;
+		root.style.bottom = lift + 'px';
 		var tr = root.getBoundingClientRect();
 		try {
 			document.querySelectorAll( AVOID ).forEach( function ( el ) {
@@ -155,6 +286,7 @@
 			} );
 		} catch ( e ) {}
 		root.style.bottom = lift + 'px';
+		scheme();
 	}
 
 	function init() {
@@ -169,11 +301,16 @@
 		}
 		root = document.createElement( 'div' );
 		root.id = 'grs-sp';
-		root.className = ( CFG.position === 'bottom-left' ) ? 'grs-left' : 'grs-right';
-		if ( CFG.style === 'photo' ) { root.className += ' grs-has-photo'; }
+		root.className = SIDE + ( CFG.style === 'photo' ? ' grs-has-photo' : '' ) + ( AUTO ? ' grs-auto' : '' );
 		root.setAttribute( 'aria-live', 'polite' );
 		document.body.appendChild( root );
 		window.addEventListener( 'resize', place );
+		// Re-match the page when the site switches its own light/dark theme.
+		if ( AUTO && window.MutationObserver ) {
+			var mo = new MutationObserver( function () { scheme(); } );
+			mo.observe( document.documentElement, { attributes: true, attributeFilter: [ 'class', 'data-theme', 'style' ] } );
+			mo.observe( document.body, { attributes: true, attributeFilter: [ 'class', 'data-theme', 'style' ] } );
+		}
 
 		fetch( CFG.endpoint, { credentials: 'omit' } )
 			.then( function ( r ) { return r.json(); } )

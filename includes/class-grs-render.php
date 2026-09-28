@@ -70,6 +70,7 @@ class GRS_Render {
 			'endpoint'    => esc_url_raw( rest_url( 'grs/v1/feed' ) ),
 			'style'       => $s['style'],
 			'position'    => $s['position'],
+			'appearance'  => $s['appearance'],
 			'showSwatch'  => ! empty( $s['show_swatch'] ),
 			'badge'       => grs_badge_active( $s ),
 			'badgeLabel'  => __( 'Verified purchase', 'genuine-recent-sales' ),
@@ -107,7 +108,11 @@ class GRS_Render {
 		if ( 'custom' === $s['appearance'] ) {
 			$bg = $s['color_bg']; $text = $s['color_text']; $title = $s['color_title']; $accent = $s['color_accent']; $line = 'rgba(128,128,128,.28)';
 		} elseif ( 'inherit' === $s['appearance'] ) {
-			$bg = 'Canvas'; $text = 'CanvasText'; $title = 'CanvasText'; $accent = $s['color_accent']; $line = 'rgba(128,128,128,.32)';
+			// "Match page": toast.js picks a light or dark card (.grs-on-light / .grs-on-dark in toast.css)
+			// from the background behind it. These are the light defaults until it does. System colours
+			// (Canvas/CanvasText) are not used: they follow color-scheme, which most themes never set,
+			// so dark sites got a white card.
+			$bg = '#ffffff'; $text = '#4a4a52'; $title = '#111114'; $accent = $s['color_accent']; $line = 'rgba(0,0,0,.12)';
 		} else {
 			$p = isset( $presets[ $s['preset'] ] ) ? $presets[ $s['preset'] ] : $presets['cream'];
 			list( $bg, $text, $title, $accent, $line ) = $p;

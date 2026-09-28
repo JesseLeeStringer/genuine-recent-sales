@@ -117,11 +117,42 @@ class GRS_Feed {
 		if ( 'initial' === $s['show_first'] && '' !== $first ) {
 			$first = mb_substr( $first, 0, 1 ) . '.';
 		}
+		$state = ! empty( $s['show_state'] ) ? (string) $order->get_billing_state() : '';
 		return array(
 			'first' => $first,
-			'town'  => ! empty( $s['show_town'] ) ? self::tc( trim( (string) $order->get_billing_city() ) ) : '',
-			'state' => ! empty( $s['show_state'] ) ? (string) $order->get_billing_state() : '',
+			'town'  => ! empty( $s['show_town'] ) ? self::town( (string) $order->get_billing_city(), (string) $order->get_billing_state(), (string) $order->get_billing_country() ) : '',
+			'state' => $state,
 		);
+	}
+
+	/**
+	 * Tidy a billing city for display: consistent word casing ("Deception bay" → "Deception Bay",
+	 * "McKinnon" untouched) and no state typed into the city field ("Godwin Beach - Qld" → "Godwin
+	 * Beach"), which would otherwise show the state twice next to the separate state field.
+	 *
+	 * @param string $town    Billing city.
+	 * @param string $state   Billing state code.
+	 * @param string $country Billing country code.
+	 * @return string
+	 */
+	private static function town( $town, $state, $country ) {
+		$town = trim( preg_replace( '/\s+/u', ' ', $town ) );
+		if ( '' !== $state ) {
+			$names = array( preg_quote( $state, '/' ) );
+			if ( function_exists( 'WC' ) && WC()->countries ) {
+				$states = WC()->countries->get_states( $country ? $country : WC()->countries->get_base_country() );
+				if ( is_array( $states ) && ! empty( $states[ $state ] ) ) {
+					$names[] = preg_quote( html_entity_decode( $states[ $state ], ENT_QUOTES, 'UTF-8' ), '/' );
+				}
+			}
+			$stripped = preg_replace( '/[\s,\-\x{2013}\x{2014}]+(?:' . implode( '|', $names ) . ')\.?$/iu', '', $town );
+			if ( is_string( $stripped ) && '' !== trim( $stripped ) ) {
+				$town = trim( $stripped );
+			}
+		}
+		$town = self::tc( $town );
+		// Mixed case: capitalise the first letter of each word without lower-casing the rest.
+		return ucwords( $town, " -'" );
 	}
 
 	/**

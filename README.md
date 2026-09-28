@@ -8,7 +8,8 @@ Most social-proof plugins let you *type in* fake notifications. This one refuses
 
 - **Real orders only.** Pulled live from WooCommerce (HPOS-compatible). No demo/fake mode exists.
 - **Three styles** — text only · text + colour swatch · text + product photo.
-- **Full theming** — Inherit theme · Preset (Cream / White / Black) · Custom (Background, Text, Title, Accent colour pickers). Corner radius + font too.
+- **Full theming** — Match page (picks a light or dark card from the background behind it, follows a site light/dark switch) · Preset (Cream / White / Black) · Custom (Background, Text, Title, Accent colour pickers). Corner radius + font too.
+- **Stays out of the way** — never covers a button, form control, filter or navigation link: it takes the other bottom corner, or waits until the visitor scrolls. Never hides while hovered or focused.
 - **Shows what matters** — up to 2 variation attributes (you pick which, or auto), with an optional colour dot. Simple products can fall back to price or category.
 - **Privacy-safe** — first name (or just an initial) + optional town/state. Never a surname, email, address or order value.
 - **Bucketed timestamps** — `< 24 hours` → `4+ days ago`. Never precise, never "2 weeks ago".
@@ -66,6 +67,14 @@ It sends:
 This displays real customers' first names and (optionally) their town/state publicly on your storefront, and serves them from a public REST endpoint (`/wp-json/grs/v1/feed`) — the same data the toast shows. Defaults are conservative (first name + town + state, paid orders, last 14 days). Choose "Initial only" and untick town/state if your jurisdiction or policies call for it. You are responsible for your own GDPR/CCPA compliance.
 
 ## Changelog
+
+- **0.4.1** — Display fixes from a live-site audit.
+  - **Never covers the page's controls:** hero calls-to-action, filter sidebars, add-to-cart buttons and nav links. If its corner is busy, the toast uses the other bottom corner, or waits and retries without using up the session cap.
+  - **"Inherit theme" is now "Match page":** it reads the background behind the toast and shows a light or dark card, following a site's light/dark switch. The system colours it used before turned white on dark sites. The accent colour can now be set in this mode.
+  - **Compact card:** unitless line-height (a theme's px line-height no longer inflates it), product names clamped to two lines, and who · when on one line.
+  - **Accessibility:** the kicker text meets AA contrast (accent kept for the dot and hover), and focus rings use the card's title colour and beat theme `!important` focus rules. The whole card is the link, and it doesn't auto-hide while hovered or focused. Dismissing hands keyboard focus back.
+  - **Tidier who-line:** "QLD · 4+ days ago" spacing, "Deception Bay" casing, and no state repeated when a customer typed it into the city field.
+  - **Cache:** the cached feed is rebuilt once after each update.
 
 - **0.4.0** — Optional GA4 events (`grs_view` / `grs_click` / `grs_dismiss`), on by default. A view only counts once the toast is rendered.
   - **Fixed — live sites ran in admin-preview cadence.** `wp_localize_script()` sends `0` as the string `"0"`, which JavaScript reads as true. Every enabled install was using the preview timing: first toast at 1.5 s, a 6.5 s gap, up to 24 per page, looping, with the per-session cap and the dismiss memory ignored.

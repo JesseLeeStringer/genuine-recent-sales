@@ -3,7 +3,7 @@
  * Plugin Name:       Genuine — Recent Sales for WooCommerce
  * Plugin URI:        https://github.com/JesseLeeStringer/genuine-recent-sales
  * Description:       Tasteful "recently purchased" notifications built from REAL WooCommerce orders — no fake data, ever. Three styles, full theming, privacy-safe, and a Verified badge you can only keep by playing it straight.
- * Version:           0.4.0
+ * Version:           0.4.1
  * Requires at least: 6.2
  * Requires PHP:      8.1
  * Requires Plugins:  woocommerce
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'GRS_VERSION', '0.4.0' );
+define( 'GRS_VERSION', '0.4.1' );
 define( 'GRS_FILE', __FILE__ );
 define( 'GRS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GRS_URL', plugin_dir_url( __FILE__ ) );
@@ -167,6 +167,14 @@ add_action( 'plugins_loaded', function () {
 	if ( class_exists( 'GRS_Settings' ) ) { new GRS_Settings(); }
 	if ( class_exists( 'GRS_Rest' ) )     { new GRS_Rest(); }
 	if ( class_exists( 'GRS_Render' ) )   { new GRS_Render(); }
+} );
+
+// After an update, rebuild the cached feed once so changes to how rows are built show straight away.
+add_action( 'plugins_loaded', function () {
+	if ( get_option( 'grs_version' ) !== GRS_VERSION ) {
+		delete_transient( GRS_FEED_TRANSIENT );
+		update_option( 'grs_version', GRS_VERSION, false );
+	}
 } );
 
 // Clear the cached feed whenever settings are saved or a relevant order lands.

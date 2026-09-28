@@ -180,16 +180,16 @@ class GRS_Settings {
 						array(
 							'preset'  => __( 'Preset (Black / White / Cream)', 'genuine-recent-sales' ),
 							'custom'  => __( 'Custom colours', 'genuine-recent-sales' ),
-							'inherit' => __( 'Inherit theme (experimental)', 'genuine-recent-sales' ),
+							'inherit' => __( 'Match page (automatic light / dark)', 'genuine-recent-sales' ),
 						),
-						__( 'Inherit reliably picks up your theme font, but not its colours — Preset or Custom give the dependable result.', 'genuine-recent-sales' ),
+						__( 'Match page picks a light or dark card from the background behind the toast (it follows a site light/dark switch too) and uses your accent colour. Preset and Custom use fixed colours.', 'genuine-recent-sales' ),
 						'grs-appearance-row'
 					);
 					$this->row_select( __( 'Preset', 'genuine-recent-sales' ), "{$n}[preset]", $s['preset'], array( 'cream' => __( 'Cream', 'genuine-recent-sales' ), 'white' => __( 'White', 'genuine-recent-sales' ), 'black' => __( 'Black', 'genuine-recent-sales' ) ), '', 'grs-when-preset' );
 					$this->row_color( __( 'Background colour', 'genuine-recent-sales' ), "{$n}[color_bg]", $s['color_bg'], 'grs-when-custom' );
 					$this->row_color( __( 'Text colour', 'genuine-recent-sales' ), "{$n}[color_text]", $s['color_text'], 'grs-when-custom' );
 					$this->row_color( __( 'Title colour', 'genuine-recent-sales' ), "{$n}[color_title]", $s['color_title'], 'grs-when-custom' );
-					$this->row_color( __( 'Accent colour', 'genuine-recent-sales' ), "{$n}[color_accent]", $s['color_accent'], 'grs-when-custom' );
+					$this->row_color( __( 'Accent colour', 'genuine-recent-sales' ), "{$n}[color_accent]", $s['color_accent'], 'grs-when-accent' );
 					$this->row_select( __( 'Font', 'genuine-recent-sales' ), "{$n}[font]", $s['font'], array( 'inherit' => __( 'Inherit theme font', 'genuine-recent-sales' ), 'system' => __( 'Clean system font', 'genuine-recent-sales' ) ) );
 					$this->row_number( __( 'Corner radius (px)', 'genuine-recent-sales' ), "{$n}[rounded]", $s['rounded'], 0, 24 );
 					?>

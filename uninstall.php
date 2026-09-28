@@ -10,4 +10,5 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 }
 
 delete_option( 'grs_settings' );
+delete_option( 'grs_version' );
 delete_transient( 'grs_feed_cache' );
