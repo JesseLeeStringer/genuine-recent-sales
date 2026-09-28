@@ -161,34 +161,49 @@ class GRS_Feed {
 			}
 		}
 		$town = self::tc( $town ); // ALL-CAPS / all-lower → Title Case
-		// Sentence case — only the first word capitalised, every later word lower-case ("Deception bay",
-		// "St kilda", "Isle of capri"): capitalise the later words, except particles. If any later word
-		// is already capitalised the customer cased it deliberately ("Barrow-in-Furness", "Bergen op
-		// Zoom", "Hawke's Bay") and it is left exactly as typed. Apostrophes are never word breaks.
-		$words = preg_split( '/[\s\-]+/u', $town, -1, PREG_SPLIT_NO_EMPTY );
+
+		// A lower-case first letter is capitalised ("deception Bay", "mcKinnon" → "McKinnon") unless the
+		// name is deliberately cased from its second letter ("eMalahleni").
+		if ( preg_match( '/^(\p{Ll})(?!\p{Lu})/u', $town, $m ) ) {
+			$town = self::upper( $m[1] ) . substr( $town, strlen( $m[1] ) );
+		}
+
+		// Sentence case — every later word lower-case ("Deception bay", "St kilda", "Deception bay
+		// 4508", "Mount gravatt (east)"): capitalise the later words, except particles. If any later word
+		// has a capital anywhere, the customer cased it deliberately ("Barrow-in-Furness", "Bergen op
+		// Zoom", "Reggio nell'Emilia", "Hawke's Bay") and it stays exactly as typed. Words are runs of
+		// letters, so numbers and brackets don't count; an apostrophe never starts a new word.
+		$words = preg_split( "/[^\\p{L}']+/u", $town, -1, PREG_SPLIT_NO_EMPTY );
 		if ( ! is_array( $words ) || count( $words ) < 2 || ! preg_match( '/^\p{Lu}/u', $words[0] ) ) {
 			return $town;
 		}
 		foreach ( array_slice( $words, 1 ) as $w ) {
-			// Any capital anywhere in a later word ("Furness", "nell'Emilia") means deliberate casing.
-			if ( ! preg_match( '/^\p{Ll}/u', $w ) || preg_match( '/\p{Lu}/u', $w ) ) {
+			if ( preg_match( '/\p{Lu}/u', $w ) ) {
 				return $town;
 			}
 		}
-		$particles = array( 'of', 'the', 'and', 'on', 'upon', 'in', 'next', 'super', 'under', 'by', 'at', 'an', 'am', 'im', 'der', 'den', 'dem', 'ob', 'zum', 'zur', 'de', 'di', 'da', 'do', 'dos', 'das', 'du', 'des', 'del', 'della', 'la', 'le', 'les', 'los', 'las', 'lez', 'en', 'sur', 'sous', 'van', 'von', 'op', 'bij', 'aan', 'ter', 'y', 'e' );
+		$particles = array( 'of', 'the', 'and', 'on', 'upon', 'in', 'next', 'super', 'under', 'der', 'ob', 'am', 'im', 'zum', 'zur',
+			'de', 'di', 'da', 'do', 'dos', 'das', 'du', 'des', 'del', 'della', 'dell', 'nel', 'nell', 'sul', 'la', 'le', 'les', 'los', 'las',
+			'en', 'sur', 'sous', 'van', 'von', 'op', 'bij', 'aan', 'ter', 'y' );
 		$out = preg_replace_callback(
-			'/(^|[\s\-])(\p{Ll})([\p{L}\']*)/u',
+			"/(?<![\\p{L}'])(\\p{Ll})([\\p{L}']*)/u",
 			function ( $m ) use ( $particles ) {
-				$word = $m[2] . $m[3];
-				if ( '' !== $m[1] && in_array( $word, $particles, true ) ) {
-					return $m[0];
-				}
-				// mbstring is optional on some hosts (WordPress does not polyfill mb_strtoupper).
-				return $m[1] . ( function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $m[2], 'UTF-8' ) : strtoupper( $m[2] ) ) . $m[3];
+				return in_array( $m[0], $particles, true ) ? $m[0] : self::upper( $m[1] ) . $m[2];
 			},
 			$town
 		);
 		return is_string( $out ) ? $out : $town;
+	}
+
+	/**
+	 * Upper-case one character. mbstring is optional on some hosts and WordPress does not polyfill
+	 * mb_strtoupper(), so fall back to strtoupper() (ASCII) without it.
+	 *
+	 * @param string $c Character.
+	 * @return string
+	 */
+	private static function upper( $c ) {
+		return function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $c, 'UTF-8' ) : strtoupper( $c );
 	}
 
 	/**

@@ -160,32 +160,41 @@
 		'.wc-block-product-filters,.wp-block-woocommerce-product-filters,.wc-block-active-filters,' +
 		'.facetwp-facet,.searchandfilter,.wpc-filters-main-wrap,.wpc-filters-open-button-container,.wpc-filters-open-widget,' +
 		'.jet-smart-filters,.berocket_single_filter_widget,.wcpf-filter,.yith-wcan-filters';
-	// A home-made filter panel: an ancestor with a class token that ENDS in filter(s)/facet(s)
-	// ("my-filters", "sgp26-facet") — but not the term/type classes WordPress and WooCommerce put on
-	// <body>, posts and products ("category-oil-filters", "product_cat-transmission-filters"), and
-	// not a results wrapper that lists products or posts.
-	var FILTERISH  = /(?:^|[-_])(?:filters?|facets?)$/i;
-	var TERM_CLASS = /^(?:category|tag|product_cat|product_tag|product_type|term|pa|post|type|status|format)[-_]/i;
-	function inFilterPanel( el ) {
+	// A home-made filter panel: an ancestor with a class token that has "filter(s)"/"facet(s)" as one of
+	// its words ("filter-panel", "category-filters", "sgp26-facet", "filters-area"). WordPress and
+	// WooCommerce write taxonomy classes ("category-oil-filters", "product_brand-ryco-filters") only
+	// on <body> and on post/product wrappers (which carry post-<id> / type-<type> / hentry), so those
+	// elements are never taken as a panel. Nor is a wrapper that holds results (products, posts).
+	var FILTER_WORD = /^(?:filters?|facets?|filterbar|filtering)$/i;
+	var POST_WRAP   = /^(?:post-\d+|type-[\w-]+|hentry)$/;
+	var RESULTS     = '.products,li.product,article,.hentry,.e-loop-item,[class^="type-"],[class*=" type-"]';
+	function panelVerdict( n ) {
+		var cl = n.classList, filterish = false, i;
+		for ( i = 0; i < cl.length; i++ ) { if ( POST_WRAP.test( cl[ i ] ) ) { return false; } }
+		for ( i = 0; i < cl.length && ! filterish; i++ ) {
+			var parts = cl[ i ].split( /[-_]/ );
+			for ( var j = 0; j < parts.length; j++ ) { if ( FILTER_WORD.test( parts[ j ] ) ) { filterish = true; break; } }
+		}
+		if ( ! filterish ) { return null; }                 // not a panel — keep looking further up
+		return ! n.querySelector( RESULTS );                 // a panel, unless it wraps the results
+	}
+	function inFilterPanel( el, memo ) {
 		for ( var n = el.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement ) {
-			var cl = n.classList;
-			for ( var i = 0; i < cl.length; i++ ) {
-				if ( FILTERISH.test( cl[ i ] ) && ! TERM_CLASS.test( cl[ i ] ) ) {
-					return ! n.querySelector( '.products,li.product,article,.e-loop-item,.type-post' );
-				}
-			}
+			var v = memo.has( n ) ? memo.get( n ) : panelVerdict( n );
+			memo.set( n, v );
+			if ( v !== null ) { return v; }
 		}
 		return false;
 	}
 	// Links only count as controls when they navigate the site or filter it; ordinary text links and
 	// whole-card product/post links are fine to cover briefly.
-	function linkIsControl( el ) {
-		return !! el.closest( 'nav,[role="navigation"],' + FILTERS ) || inFilterPanel( el );
+	function linkIsControl( el, memo ) {
+		return !! el.closest( 'nav,[role="navigation"],' + FILTERS ) || inFilterPanel( el, memo );
 	}
 	function coversControl() {
 		var box = root.getBoundingClientRect(); // the card's own transform does not move its container
 		if ( ! box.width || ! box.height ) { return false; }
-		var area = box.width * box.height, els;
+		var area = box.width * box.height, els, memo = new Map(); // panel verdicts cached per ancestor for this pass
 		try { els = document.querySelectorAll( KEEP + ',a[href]' ); } catch ( e ) { return false; }
 		for ( var i = 0; i < els.length; i++ ) {
 			var el = els[ i ];
@@ -198,7 +207,7 @@
 			try {
 				// Buttons and form controls always count, whatever their size (a wide button, a big
 				// textarea). A plain link counts only if it is small (not a whole card) and navigational.
-				if ( ! el.matches( KEEP ) && ( r.width * r.height > area * 1.5 || ! linkIsControl( el ) ) ) { continue; }
+				if ( ! el.matches( KEEP ) && ( r.width * r.height > area * 1.5 || ! linkIsControl( el, memo ) ) ) { continue; }
 			} catch ( e ) { continue; }
 			// Only count it if it is really on top there (not behind an overlay, not in a closed menu).
 			var top = topAt( Math.max( r.left, box.left ) + ix / 2, Math.max( r.top, box.top ) + iy / 2 );
@@ -215,6 +224,7 @@
 			var t = root && root.querySelector( '.grs-t.grs-show' );
 			if ( ! t || t.grsGone || ( t.grsHold && t.grsHold() ) || ! coversControl() ) { return; }
 			t.grsGone = true;
+			releaseFocus( t, t.grsKb && t.grsKb() );
 			hide( t );
 			setTimeout( function () { if ( ! stop ) { step(); } }, GAP );
 		}, 150 );
@@ -281,8 +291,10 @@
 		// at that moment) stays "mouse focus" even if Chrome later draws a ring after a keypress.
 		var kbFocus = false, heldSince = 0;
 		t.addEventListener( 'focusin', function ( ev ) {
-			if ( ev.relatedTarget && ! t.contains( ev.relatedTarget ) ) { lastFocus = ev.relatedTarget; }
-			try { kbFocus = ev.target.matches( ':focus-visible' ); } catch ( e ) { kbFocus = false; }
+			// Browsers without :focus-visible: assume keyboard (older Safari never mouse-focuses links).
+			try { kbFocus = ev.target.matches( ':focus-visible' ); } catch ( e ) { kbFocus = true; }
+			// Remember where keyboard focus came from (only keyboard entries), to hand it back later.
+			if ( kbFocus && ev.relatedTarget && ! t.contains( ev.relatedTarget ) ) { lastFocus = ev.relatedTarget; }
 		} );
 		t.addEventListener( 'focusout', function ( ev ) {
 			if ( ! ev.relatedTarget || ! t.contains( ev.relatedTarget ) ) { kbFocus = false; }
@@ -303,17 +315,10 @@
 			ev.preventDefault(); ev.stopPropagation();
 			if ( ! PREVIEW ) { try { localStorage.setItem( 'grs_dismissed', String( Date.now() ) ); } catch ( e ) {} }
 			track( 'grs_dismiss', o, seq );
-			var ae = document.activeElement;
-			if ( ae && t.contains( ae ) ) {
-				// Keyboard dismiss: send focus back where it came from, without scrolling the page.
-				if ( kbFocus && lastFocus && lastFocus !== document.body && document.contains( lastFocus ) && lastFocus.focus ) {
-					try { lastFocus.focus( { preventScroll: true } ); } catch ( e ) {}
-				}
-				// Never leave focus inside a card that is about to be aria-hidden and removed.
-				if ( t.contains( document.activeElement ) ) { document.activeElement.blur(); }
-			}
+			releaseFocus( t, kbFocus );
 			hide( t ); stop = true; finish();
 		} );
+		t.grsKb = function () { return kbFocus; };
 
 		// A view is counted only once the card is actually rendered: requestAnimationFrame never runs in
 		// a background tab, a card removed before its frame arrives is not counted, and a card inside a
@@ -328,6 +333,18 @@
 		shown++;
 		if ( ! PREVIEW ) { try { sessionStorage.setItem( 'grs_shown', String( shown ) ); } catch ( e ) {} }
 		return true;
+	}
+
+	// Before a card is hidden (dismiss, auto-hide, scroll release): never leave focus inside a card that
+	// is about to be aria-hidden and removed. Keyboard focus goes back where it came from, without
+	// scrolling the page; otherwise it is simply released.
+	function releaseFocus( t, kb ) {
+		var ae = document.activeElement;
+		if ( ! ae || ! t.contains( ae ) ) { return; }
+		if ( kb && lastFocus && lastFocus !== document.body && document.contains( lastFocus ) && lastFocus.focus ) {
+			try { lastFocus.focus( { preventScroll: true } ); } catch ( e ) {}
+		}
+		if ( t.contains( document.activeElement ) ) { document.activeElement.blur(); }
 	}
 
 	// Drop the class to fade out, then take the node OUT of the DOM once the transition ends.
@@ -347,6 +364,7 @@
 		setTimeout( function () {
 			if ( t.grsGone || ! t.parentNode || ! t.classList.contains( 'grs-show' ) && t.getAttribute( 'aria-hidden' ) === 'true' ) { return; } // dismissed, or let go early after a scroll
 			if ( t.grsHold && t.grsHold() ) { hideLater( t, 1500 ); return; }
+			releaseFocus( t, t.grsKb && t.grsKb() );
 			hide( t );
 			setTimeout( function () { if ( ! stop ) { step(); } }, GAP );
 		}, ms );
