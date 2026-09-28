@@ -173,7 +173,8 @@ class GRS_Feed {
 		// has a capital anywhere, the customer cased it deliberately ("Barrow-in-Furness", "Bergen op
 		// Zoom", "Reggio nell'Emilia", "Hawke's Bay") and it stays exactly as typed. Words are runs of
 		// letters, so numbers and brackets don't count; an apostrophe never starts a new word.
-		$words = preg_split( "/[^\\p{L}']+/u", $town, -1, PREG_SPLIT_NO_EMPTY );
+		// Straight (') and curly (’, U+2019 — what phone keyboards type) apostrophes both stay inside a word.
+		$words = preg_split( "/[^\\p{L}'\\x{2019}]+/u", $town, -1, PREG_SPLIT_NO_EMPTY );
 		if ( ! is_array( $words ) || count( $words ) < 2 || ! preg_match( '/^\p{Lu}/u', $words[0] ) ) {
 			return $town;
 		}
@@ -182,11 +183,11 @@ class GRS_Feed {
 				return $town;
 			}
 		}
-		$particles = array( 'of', 'the', 'and', 'on', 'upon', 'in', 'next', 'super', 'under', 'der', 'ob', 'am', 'im', 'zum', 'zur',
+		$particles = array( 'of', 'the', 'and', 'on', 'upon', 'in', 'by', 'next', 'super', 'under', 'der', 'ob', 'am', 'im', 'zum', 'zur',
 			'de', 'di', 'da', 'do', 'dos', 'das', 'du', 'des', 'del', 'della', 'dell', 'nel', 'nell', 'sul', 'la', 'le', 'les', 'los', 'las',
 			'en', 'sur', 'sous', 'van', 'von', 'op', 'bij', 'aan', 'ter', 'y' );
 		$out = preg_replace_callback(
-			"/(?<![\\p{L}'])(\\p{Ll})([\\p{L}']*)/u",
+			"/(?<![\\p{L}'\\x{2019}])(\\p{Ll})([\\p{L}'\\x{2019}]*)/u",
 			function ( $m ) use ( $particles ) {
 				return in_array( $m[0], $particles, true ) ? $m[0] : self::upper( $m[1] ) . $m[2];
 			},
