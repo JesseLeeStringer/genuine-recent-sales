@@ -156,18 +156,31 @@
 	var KEEP = 'button,input:not([type="hidden"]),select,textarea,summary,[role="button"],[role="checkbox"],[role="radio"],[role="tab"],[role="switch"],' +
 		'a.button,a[class*="button"],a[class*="btn"],.elementor-button,.wp-block-button__link,.add_to_cart_button';
 	// Filter / facet widgets from WooCommerce and the common filter plugins.
-	var FILTERS = '.woocommerce-widget-layered-nav,.widget_layered_nav,.wc-block-product-filters,.wp-block-woocommerce-product-filters,.widget_price_filter,' +
-		'.facetwp-facet,.searchandfilter,.wpc-filters-main-wrap,.jet-smart-filters,.berocket_single_filter_widget,.wcpf-filter,.yith-wcan-filters';
-	function isControl( el ) {
-		if ( el.matches( KEEP ) ) { return true; }
-		if ( el.tagName !== 'A' ) { return false; }
-		if ( el.closest( 'nav,[role="navigation"],' + FILTERS ) ) { return true; }
-		// A home-made filter panel (class containing "filter"/"facet") counts too — but not a product
-		// grid, a product card or a whole page section that merely has the word in a class name (a
-		// category called "…-filters" puts it on <body> and on every product in it).
-		var f = el.closest( '[class*="filter"],[class*="facet"]' );
-		return !! ( f && f !== document.body && f !== document.documentElement &&
-			! el.closest( 'li.product,.product,.products' ) && ! f.querySelector( '.products,li.product' ) );
+	var FILTERS = '.woocommerce-widget-layered-nav,.widget_layered_nav,.widget_layered_nav_filters,.widget_rating_filter,.widget_price_filter,' +
+		'.wc-block-product-filters,.wp-block-woocommerce-product-filters,.wc-block-active-filters,' +
+		'.facetwp-facet,.searchandfilter,.wpc-filters-main-wrap,.wpc-filters-open-button-container,.wpc-filters-open-widget,' +
+		'.jet-smart-filters,.berocket_single_filter_widget,.wcpf-filter,.yith-wcan-filters';
+	// A home-made filter panel: an ancestor with a class token that ENDS in filter(s)/facet(s)
+	// ("my-filters", "sgp26-facet") — but not the term/type classes WordPress and WooCommerce put on
+	// <body>, posts and products ("category-oil-filters", "product_cat-transmission-filters"), and
+	// not a results wrapper that lists products or posts.
+	var FILTERISH  = /(?:^|[-_])(?:filters?|facets?)$/i;
+	var TERM_CLASS = /^(?:category|tag|product_cat|product_tag|product_type|term|pa|post|type|status|format)[-_]/i;
+	function inFilterPanel( el ) {
+		for ( var n = el.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement ) {
+			var cl = n.classList;
+			for ( var i = 0; i < cl.length; i++ ) {
+				if ( FILTERISH.test( cl[ i ] ) && ! TERM_CLASS.test( cl[ i ] ) ) {
+					return ! n.querySelector( '.products,li.product,article,.e-loop-item,.type-post' );
+				}
+			}
+		}
+		return false;
+	}
+	// Links only count as controls when they navigate the site or filter it; ordinary text links and
+	// whole-card product/post links are fine to cover briefly.
+	function linkIsControl( el ) {
+		return !! el.closest( 'nav,[role="navigation"],' + FILTERS ) || inFilterPanel( el );
 	}
 	function coversControl() {
 		var box = root.getBoundingClientRect(); // the card's own transform does not move its container
@@ -178,11 +191,15 @@
 			var el = els[ i ];
 			if ( root.contains( el ) ) { continue; }
 			var r = el.getBoundingClientRect();
-			if ( r.width < 1 || r.height < 1 || r.width * r.height > area * 1.5 ) { continue; }
+			if ( r.width < 1 || r.height < 1 ) { continue; }
 			var ix = Math.min( r.right, box.right ) - Math.max( r.left, box.left );
 			var iy = Math.min( r.bottom, box.bottom ) - Math.max( r.top, box.top );
 			if ( ix < 6 || iy < 6 ) { continue; }
-			try { if ( ! isControl( el ) ) { continue; } } catch ( e ) { continue; }
+			try {
+				// Buttons and form controls always count, whatever their size (a wide button, a big
+				// textarea). A plain link counts only if it is small (not a whole card) and navigational.
+				if ( ! el.matches( KEEP ) && ( r.width * r.height > area * 1.5 || ! linkIsControl( el ) ) ) { continue; }
+			} catch ( e ) { continue; }
 			// Only count it if it is really on top there (not behind an overlay, not in a closed menu).
 			var top = topAt( Math.max( r.left, box.left ) + ix / 2, Math.max( r.top, box.top ) + iy / 2 );
 			if ( top && ( top === el || el.contains( top ) ) ) { return true; }
@@ -260,19 +277,26 @@
 			a.addEventListener( 'click', function () { track( 'grs_click', o, seq, a.href ); } );
 			a.addEventListener( 'auxclick', function ( ev ) { if ( ev.button === 1 ) { track( 'grs_click', o, seq, a.href ); } } ); // middle-click / new tab
 		}
-		// Remember where keyboard focus came from, so a keyboard dismiss can hand it back.
+		// Keyboard focus is judged when it ARRIVES: focus that came from a mouse click (no :focus-visible
+		// at that moment) stays "mouse focus" even if Chrome later draws a ring after a keypress.
+		var kbFocus = false, heldSince = 0;
 		t.addEventListener( 'focusin', function ( ev ) {
 			if ( ev.relatedTarget && ! t.contains( ev.relatedTarget ) ) { lastFocus = ev.relatedTarget; }
+			try { kbFocus = ev.target.matches( ':focus-visible' ); } catch ( e ) { kbFocus = false; }
+		} );
+		t.addEventListener( 'focusout', function ( ev ) {
+			if ( ! ev.relatedTarget || ! t.contains( ev.relatedTarget ) ) { kbFocus = false; }
 		} );
 		// Hold the card open while a MOUSE is over it (a touch leaves a sticky :hover behind, so it
-		// does not count) or while it has KEYBOARD focus (a mouse click also focuses the link).
+		// does not count) or while it has KEYBOARD focus — for at most a minute, as a safety net.
 		var hovering = false;
 		t.addEventListener( 'pointerenter', function ( ev ) { if ( ev.pointerType === 'mouse' ) { hovering = true; } } );
 		t.addEventListener( 'pointerleave', function () { hovering = false; } );
 		t.grsHold = function () {
-			var ae = document.activeElement, kb = false;
-			if ( ae && t.contains( ae ) ) { try { kb = ae.matches( ':focus-visible' ); } catch ( e ) { kb = true; } }
-			return hovering || kb;
+			var held = hovering || ( kbFocus && t.contains( document.activeElement ) );
+			if ( ! held ) { heldSince = 0; return false; }
+			if ( ! heldSince ) { heldSince = Date.now(); }
+			return Date.now() - heldSince < 60000;
 		};
 
 		t.querySelector( '.grs-x' ).addEventListener( 'click', function ( ev ) {
@@ -282,9 +306,7 @@
 			var ae = document.activeElement;
 			if ( ae && t.contains( ae ) ) {
 				// Keyboard dismiss: send focus back where it came from, without scrolling the page.
-				var kb = false;
-				try { kb = ae.matches( ':focus-visible' ); } catch ( e ) {}
-				if ( kb && lastFocus && lastFocus !== document.body && document.contains( lastFocus ) && lastFocus.focus ) {
+				if ( kbFocus && lastFocus && lastFocus !== document.body && document.contains( lastFocus ) && lastFocus.focus ) {
 					try { lastFocus.focus( { preventScroll: true } ); } catch ( e ) {}
 				}
 				// Never leave focus inside a card that is about to be aria-hidden and removed.
@@ -399,11 +421,11 @@
 		fetch( CFG.endpoint, { credentials: 'omit' } )
 			.then( function ( r ) { return r.json(); } )
 			.then( function ( data ) {
-				if ( ! data || ! data.length ) { return; }
+				if ( ! data || ! data.length ) { finish(); return; }
 				queue = shuffle( data.slice() );
 				setTimeout( step, DELAY );
 			} )
-			.catch( function () {} );
+			.catch( function () { finish(); } );
 	}
 
 	if ( document.readyState !== 'loading' ) { init(); } else { document.addEventListener( 'DOMContentLoaded', init ); }

@@ -161,10 +161,21 @@ class GRS_Feed {
 			}
 		}
 		$town = self::tc( $town ); // ALL-CAPS / all-lower → Title Case
-		// Mixed case ("Deception bay", "St kilda"): capitalise a word that starts lower-case, except
-		// particles after the first word ("Isle of Capri"). Apostrophes are never word breaks, so
-		// "Hawke's Bay" and "O'Connor" are left alone.
-		$particles = array( 'of', 'the', 'and', 'on', 'upon', 'de', 'di', 'da', 'do', 'dos', 'del', 'della', 'la', 'le', 'en', 'sur', 'am', 'van', 'von', 'y' );
+		// Sentence case — only the first word capitalised, every later word lower-case ("Deception bay",
+		// "St kilda", "Isle of capri"): capitalise the later words, except particles. If any later word
+		// is already capitalised the customer cased it deliberately ("Barrow-in-Furness", "Bergen op
+		// Zoom", "Hawke's Bay") and it is left exactly as typed. Apostrophes are never word breaks.
+		$words = preg_split( '/[\s\-]+/u', $town, -1, PREG_SPLIT_NO_EMPTY );
+		if ( ! is_array( $words ) || count( $words ) < 2 || ! preg_match( '/^\p{Lu}/u', $words[0] ) ) {
+			return $town;
+		}
+		foreach ( array_slice( $words, 1 ) as $w ) {
+			// Any capital anywhere in a later word ("Furness", "nell'Emilia") means deliberate casing.
+			if ( ! preg_match( '/^\p{Ll}/u', $w ) || preg_match( '/\p{Lu}/u', $w ) ) {
+				return $town;
+			}
+		}
+		$particles = array( 'of', 'the', 'and', 'on', 'upon', 'in', 'next', 'super', 'under', 'by', 'at', 'an', 'am', 'im', 'der', 'den', 'dem', 'ob', 'zum', 'zur', 'de', 'di', 'da', 'do', 'dos', 'das', 'du', 'des', 'del', 'della', 'la', 'le', 'les', 'los', 'las', 'lez', 'en', 'sur', 'sous', 'van', 'von', 'op', 'bij', 'aan', 'ter', 'y', 'e' );
 		$out = preg_replace_callback(
 			'/(^|[\s\-])(\p{Ll})([\p{L}\']*)/u',
 			function ( $m ) use ( $particles ) {
