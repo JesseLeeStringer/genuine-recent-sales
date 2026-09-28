@@ -145,6 +145,8 @@
 	function finish() {
 		if ( mo ) { mo.disconnect(); mo = null; }
 		window.removeEventListener( 'resize', place );
+		window.removeEventListener( 'scroll', onScroll );
+		clearTimeout( scrollTimer );
 	}
 
 	// ── Keep clear of the page's controls ────────────────────────
@@ -186,6 +188,19 @@
 			if ( top && ( top === el || el.contains( top ) ) ) { return true; }
 		}
 		return false;
+	}
+	// The check above runs when a toast appears. If the visitor then scrolls a control under a toast
+	// that is still showing, let it go early once scrolling stops, instead of sitting on the control.
+	var scrollTimer = null;
+	function onScroll() {
+		clearTimeout( scrollTimer );
+		scrollTimer = setTimeout( function () {
+			var t = root && root.querySelector( '.grs-t.grs-show' );
+			if ( ! t || t.grsGone || ( t.grsHold && t.grsHold() ) || ! coversControl() ) { return; }
+			t.grsGone = true;
+			hide( t );
+			setTimeout( function () { if ( ! stop ) { step(); } }, GAP );
+		}, 150 );
 	}
 	function setSide( side ) {
 		root.classList.remove( 'grs-left', 'grs-right' );
@@ -308,7 +323,7 @@
 	// check again shortly instead. Then wait the gap and move on to the next toast.
 	function hideLater( t, ms ) {
 		setTimeout( function () {
-			if ( ! t.parentNode || ! t.classList.contains( 'grs-show' ) && t.getAttribute( 'aria-hidden' ) === 'true' ) { return; } // dismissed
+			if ( t.grsGone || ! t.parentNode || ! t.classList.contains( 'grs-show' ) && t.getAttribute( 'aria-hidden' ) === 'true' ) { return; } // dismissed, or let go early after a scroll
 			if ( t.grsHold && t.grsHold() ) { hideLater( t, 1500 ); return; }
 			hide( t );
 			setTimeout( function () { if ( ! stop ) { step(); } }, GAP );
@@ -373,6 +388,7 @@
 		root.setAttribute( 'aria-live', 'polite' );
 		document.body.appendChild( root );
 		window.addEventListener( 'resize', place );
+		window.addEventListener( 'scroll', onScroll, { passive: true } );
 		// Re-match the page when the site switches its own light/dark theme.
 		if ( AUTO && window.MutationObserver ) {
 			mo = new MutationObserver( schemeSoon );

@@ -69,7 +69,7 @@ This displays real customers' first names and (optionally) their town/state publ
 ## Changelog
 
 - **0.4.1** — Display fixes from a live-site audit.
-  - **Never covers the page's controls:** hero calls-to-action, filter sidebars, add-to-cart buttons and nav links. If its corner is busy, the toast uses the other bottom corner, or waits and retries without using up the session cap.
+  - **Never covers the page's controls:** hero calls-to-action, filter sidebars, add-to-cart buttons and nav links. If its corner is busy, the toast uses the other bottom corner, or waits and retries without using up the session cap. If the visitor scrolls a control under a toast that is already showing, it fades out early.
   - **"Inherit theme" is now "Match page":** it reads the background behind the toast and shows a light or dark card, following a site's light/dark switch. The system colours it used before turned white on dark sites. The accent colour can now be set in this mode.
   - **Compact card:** unitless line-height (a theme's px line-height no longer inflates it), product names clamped to two lines, and who · when on one line.
   - **Accessibility:** the kicker text meets AA contrast (accent kept for the dot and hover), and focus rings use the card's title colour and beat theme `!important` focus rules. The whole card is the link, and it doesn't auto-hide while hovered or focused. Dismissing hands keyboard focus back.
