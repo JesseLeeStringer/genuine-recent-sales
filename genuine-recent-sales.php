@@ -173,7 +173,7 @@ add_action( 'plugins_loaded', function () {
 add_action( 'plugins_loaded', function () {
 	if ( get_option( 'grs_version' ) !== GRS_VERSION ) {
 		delete_transient( GRS_FEED_TRANSIENT );
-		update_option( 'grs_version', GRS_VERSION, false );
+		update_option( 'grs_version', GRS_VERSION, true ); // autoloaded: it is read on every request
 	}
 } );
 

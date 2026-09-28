@@ -136,23 +136,48 @@ class GRS_Feed {
 	 * @return string
 	 */
 	private static function town( $town, $state, $country ) {
-		$town = trim( preg_replace( '/\s+/u', ' ', $town ) );
+		$clean = preg_replace( '/\s+/u', ' ', $town );
+		$town  = trim( is_string( $clean ) ? $clean : $town );
 		if ( '' !== $state ) {
-			$names = array( preg_quote( $state, '/' ) );
+			// The state CODE may follow a space or punctuation ("Brisbane QLD", "Godwin Beach - Qld");
+			// the full state NAME only after punctuation ("Brisbane, Queensland", "Swords, Co. Dublin"),
+			// so a real place such as "Mount Victoria" keeps its name. An optional "Co." / "County"
+			// before it goes too.
+			$county   = '(?:co\.?\s+|county\s+)?';
+			$patterns = array( '/(?:\s*[,\-\x{2013}\x{2014}]\s*|\s+)' . $county . preg_quote( $state, '/' ) . '\.?$/iu' );
 			if ( function_exists( 'WC' ) && WC()->countries ) {
 				$states = WC()->countries->get_states( $country ? $country : WC()->countries->get_base_country() );
 				if ( is_array( $states ) && ! empty( $states[ $state ] ) ) {
-					$names[] = preg_quote( html_entity_decode( $states[ $state ], ENT_QUOTES, 'UTF-8' ), '/' );
+					$full       = html_entity_decode( $states[ $state ], ENT_QUOTES, 'UTF-8' );
+					$patterns[] = '/\s*[,\-\x{2013}\x{2014}]\s*' . $county . preg_quote( $full, '/' ) . '\.?$/iu';
 				}
 			}
-			$stripped = preg_replace( '/[\s,\-\x{2013}\x{2014}]+(?:' . implode( '|', $names ) . ')\.?$/iu', '', $town );
-			if ( is_string( $stripped ) && '' !== trim( $stripped ) ) {
-				$town = trim( $stripped );
+			foreach ( $patterns as $p ) {
+				$stripped = preg_replace( $p, '', $town );
+				if ( is_string( $stripped ) && '' !== trim( $stripped ) && $stripped !== $town ) {
+					$town = trim( $stripped );
+					break;
+				}
 			}
 		}
-		$town = self::tc( $town );
-		// Mixed case: capitalise the first letter of each word without lower-casing the rest.
-		return ucwords( $town, " -'" );
+		$town = self::tc( $town ); // ALL-CAPS / all-lower → Title Case
+		// Mixed case ("Deception bay", "St kilda"): capitalise a word that starts lower-case, except
+		// particles after the first word ("Isle of Capri"). Apostrophes are never word breaks, so
+		// "Hawke's Bay" and "O'Connor" are left alone.
+		$particles = array( 'of', 'the', 'and', 'on', 'upon', 'de', 'di', 'da', 'do', 'dos', 'del', 'della', 'la', 'le', 'en', 'sur', 'am', 'van', 'von', 'y' );
+		$out = preg_replace_callback(
+			'/(^|[\s\-])(\p{Ll})([\p{L}\']*)/u',
+			function ( $m ) use ( $particles ) {
+				$word = $m[2] . $m[3];
+				if ( '' !== $m[1] && in_array( $word, $particles, true ) ) {
+					return $m[0];
+				}
+				// mbstring is optional on some hosts (WordPress does not polyfill mb_strtoupper).
+				return $m[1] . ( function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $m[2], 'UTF-8' ) : strtoupper( $m[2] ) ) . $m[3];
+			},
+			$town
+		);
+		return is_string( $out ) ? $out : $town;
 	}
 
 	/**

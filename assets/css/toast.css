@@ -52,8 +52,10 @@
 #grs-sp .grs-x:hover, #grs-sp .grs-x:focus-visible { opacity: 1; background: rgba(128,128,128,.14); }
 
 /* Focus rings in the card's own title colour, so they keep contrast on any card — and win over theme
-   focus rules that are themselves !important (many themes style every a/button:focus-visible). */
-#grs-sp .grs-link:focus-visible,
+   focus rules that are themselves !important (many themes style every a/button:focus-visible). The
+   link fills the card, so its ring is drawn INSIDE the card (over the card colour it contrasts with),
+   not outside on the page. */
+#grs-sp .grs-link:focus-visible { outline: 2px solid var(--grs-title, #211E18) !important; outline-offset: -4px !important; box-shadow: none !important; }
 #grs-sp .grs-x:focus-visible { outline: 2px solid var(--grs-title, #211E18) !important; outline-offset: 2px !important; box-shadow: none !important; }
 
 /* Kicker text uses the text colour (small uppercase text in a mid-tone accent fails contrast); the accent
@@ -73,10 +75,11 @@
 #grs-sp .grs-vdot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(128,128,128,.35); flex: none; }
 #grs-sp .grs-sep { opacity: .5; }
 
-/* One line: who · when. A very long town ends in an ellipsis instead of pushing "ago" onto a line of its own. */
-#grs-sp .grs-a { margin-top: .45rem; font-size: .72rem; line-height: 1.35; color: var(--grs-text, #46413A); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px; }
-#grs-sp .grs-a .grs-who { font-weight: 500; }
-#grs-sp .grs-ago { white-space: nowrap; }
+/* One line: who · when. The name/town part takes the ellipsis when space runs out; "· 4+ days ago"
+   (the part that makes it social proof) always shows in full. */
+#grs-sp .grs-a { display: flex; align-items: baseline; gap: .35em; min-width: 0; margin-top: .45rem; font-size: .72rem; line-height: 1.35; color: var(--grs-text, #46413A); white-space: nowrap; }
+#grs-sp .grs-a .grs-who { font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#grs-sp .grs-a .grs-sep, #grs-sp .grs-a .grs-ago { flex: none; }
 
 /* Photo style */
 #grs-sp .grs-thumb { flex: none; width: 52px; height: 52px; border-radius: 6px; overflow: hidden; background: rgba(128,128,128,.12); border: 1px solid var(--grs-line, rgba(128,128,128,.28)); }

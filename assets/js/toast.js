@@ -19,7 +19,7 @@
 	var RETRY   = 4000; // a spot that would cover a control is re-tried this often…
 	var RETRIES = 30;   // …for about two minutes per toast, then this page gives up
 
-	var shown = 0, stop = false, queue = [], qi = 0, root = null, retries = 0, lastFocus = null;
+	var shown = 0, stop = false, queue = [], qi = 0, root = null, retries = 0, lastFocus = null, mo = null, moQueued = false, cctx = null;
 
 	function esc( s ) {
 		return String( s == null ? '' : s ).replace( /[&<>"]/g, function ( m ) {
@@ -69,10 +69,30 @@
 	// dark site got a white card. Instead: read the opaque background actually behind the toast and
 	// switch between a light and a dark card (colours live in toast.css).
 	function rgb( s ) {
-		var m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%?))?/.exec( s || '' );
-		if ( ! m ) { return null; }
-		var a = m[ 4 ] === undefined ? 1 : parseFloat( m[ 4 ] ) / ( m[ 5 ] ? 100 : 1 );
-		return [ +m[ 1 ], +m[ 2 ], +m[ 3 ], a ];
+		if ( ! s || s === 'transparent' ) { return null; }
+		var m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%?))?/.exec( s );
+		if ( m ) {
+			var a = m[ 4 ] === undefined ? 1 : parseFloat( m[ 4 ] ) / ( m[ 5 ] ? 100 : 1 );
+			return [ +m[ 1 ], +m[ 2 ], +m[ 3 ], a ];
+		}
+		// Modern colour syntaxes (oklch(), lab(), color(srgb …) — what browsers report for colours
+		// authored that way): let a 1×1 canvas convert them to sRGB. A value the canvas cannot parse
+		// leaves the sentinel in place and counts as unknown.
+		try {
+			if ( ! cctx ) {
+				var c = document.createElement( 'canvas' );
+				c.width = c.height = 1;
+				cctx = c.getContext( '2d', { willReadFrequently: true } );
+			}
+			cctx.fillStyle = 'rgba(1, 2, 3, 0.5)';
+			var sentinel = cctx.fillStyle;
+			cctx.fillStyle = s;
+			if ( cctx.fillStyle === sentinel ) { return null; }
+			cctx.clearRect( 0, 0, 1, 1 );
+			cctx.fillRect( 0, 0, 1, 1 );
+			var d = cctx.getImageData( 0, 0, 1, 1 ).data;
+			return [ d[ 0 ], d[ 1 ], d[ 2 ], d[ 3 ] / 255 ];
+		} catch ( e ) { return null; }
 	}
 	function lum( c ) {
 		var f = function ( v ) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow( ( v + 0.055 ) / 1.055, 2.4 ); };
@@ -110,19 +130,48 @@
 			root.classList.toggle( 'grs-on-light', ! dark );
 		} catch ( e ) {}
 	}
+	// Theme switches arrive as class/data-theme/style changes on <html>/<body>. Many themes also touch
+	// those on every scroll, so coalesce to one check per frame, and only while a card is on screen.
+	function schemeSoon() {
+		if ( moQueued ) { return; }
+		moQueued = true;
+		requestAnimationFrame( function () {
+			moQueued = false;
+			if ( root && root.querySelector( '.grs-t' ) ) { scheme(); }
+		} );
+	}
+	// No more toasts on this page (dismissed, cap reached, queue done, or never a clear spot): stop
+	// watching the page.
+	function finish() {
+		if ( mo ) { mo.disconnect(); mo = null; }
+		window.removeEventListener( 'resize', place );
+	}
 
 	// ── Keep clear of the page's controls ────────────────────────
 	// A toast must never sit over a button, a form control, a filter or a navigation link — at a
 	// laptop height a bottom corner is often exactly where a hero's call-to-action or a shop's filter
 	// sidebar lives. Ordinary text links and whole-card product links are fine to cover briefly.
 	var KEEP = 'button,input:not([type="hidden"]),select,textarea,summary,[role="button"],[role="checkbox"],[role="radio"],[role="tab"],[role="switch"],' +
-		'a.button,a[class*="button"],a[class*="btn"],.elementor-button,.wp-block-button__link,.add_to_cart_button,' +
-		'nav a,[role="navigation"] a,.woocommerce-widget-layered-nav a,[class*="filter"] a,[class*="facet"] a';
+		'a.button,a[class*="button"],a[class*="btn"],.elementor-button,.wp-block-button__link,.add_to_cart_button';
+	// Filter / facet widgets from WooCommerce and the common filter plugins.
+	var FILTERS = '.woocommerce-widget-layered-nav,.widget_layered_nav,.wc-block-product-filters,.wp-block-woocommerce-product-filters,.widget_price_filter,' +
+		'.facetwp-facet,.searchandfilter,.wpc-filters-main-wrap,.jet-smart-filters,.berocket_single_filter_widget,.wcpf-filter,.yith-wcan-filters';
+	function isControl( el ) {
+		if ( el.matches( KEEP ) ) { return true; }
+		if ( el.tagName !== 'A' ) { return false; }
+		if ( el.closest( 'nav,[role="navigation"],' + FILTERS ) ) { return true; }
+		// A home-made filter panel (class containing "filter"/"facet") counts too — but not a product
+		// grid, a product card or a whole page section that merely has the word in a class name (a
+		// category called "…-filters" puts it on <body> and on every product in it).
+		var f = el.closest( '[class*="filter"],[class*="facet"]' );
+		return !! ( f && f !== document.body && f !== document.documentElement &&
+			! el.closest( 'li.product,.product,.products' ) && ! f.querySelector( '.products,li.product' ) );
+	}
 	function coversControl() {
 		var box = root.getBoundingClientRect(); // the card's own transform does not move its container
 		if ( ! box.width || ! box.height ) { return false; }
 		var area = box.width * box.height, els;
-		try { els = document.querySelectorAll( KEEP ); } catch ( e ) { return false; }
+		try { els = document.querySelectorAll( KEEP + ',a[href]' ); } catch ( e ) { return false; }
 		for ( var i = 0; i < els.length; i++ ) {
 			var el = els[ i ];
 			if ( root.contains( el ) ) { continue; }
@@ -131,6 +180,7 @@
 			var ix = Math.min( r.right, box.right ) - Math.max( r.left, box.left );
 			var iy = Math.min( r.bottom, box.bottom ) - Math.max( r.top, box.top );
 			if ( ix < 6 || iy < 6 ) { continue; }
+			try { if ( ! isControl( el ) ) { continue; } } catch ( e ) { continue; }
 			// Only count it if it is really on top there (not behind an overlay, not in a closed menu).
 			var top = topAt( Math.max( r.left, box.left ) + ix / 2, Math.max( r.top, box.top ) + iy / 2 );
 			if ( top && ( top === el || el.contains( top ) ) ) { return true; }
@@ -158,6 +208,7 @@
 	// would cover one of the page's controls.
 	function render( o ) {
 		var seq   = shown + 1;
+		lastFocus = null;
 		var badge = flag( CFG.badge ) ? '<span class="grs-badge">✓ ' + esc( CFG.badgeLabel ) + '</span>' : '';
 		var who   = esc( o.first ) + ( o.town ? ' from ' + esc( o.town ) : '' ) + ( o.state ? ', ' + esc( o.state ) : '' );
 		var thumb = ( CFG.style === 'photo' && o.img ) ? '<span class="grs-thumb"><img src="' + esc( o.img ) + '" alt="" loading="lazy"></span>' : '';
@@ -194,19 +245,37 @@
 			a.addEventListener( 'click', function () { track( 'grs_click', o, seq, a.href ); } );
 			a.addEventListener( 'auxclick', function ( ev ) { if ( ev.button === 1 ) { track( 'grs_click', o, seq, a.href ); } } ); // middle-click / new tab
 		}
-		// Remember where keyboard focus came from, so a dismiss can hand it back.
+		// Remember where keyboard focus came from, so a keyboard dismiss can hand it back.
 		t.addEventListener( 'focusin', function ( ev ) {
 			if ( ev.relatedTarget && ! t.contains( ev.relatedTarget ) ) { lastFocus = ev.relatedTarget; }
 		} );
+		// Hold the card open while a MOUSE is over it (a touch leaves a sticky :hover behind, so it
+		// does not count) or while it has KEYBOARD focus (a mouse click also focuses the link).
+		var hovering = false;
+		t.addEventListener( 'pointerenter', function ( ev ) { if ( ev.pointerType === 'mouse' ) { hovering = true; } } );
+		t.addEventListener( 'pointerleave', function () { hovering = false; } );
+		t.grsHold = function () {
+			var ae = document.activeElement, kb = false;
+			if ( ae && t.contains( ae ) ) { try { kb = ae.matches( ':focus-visible' ); } catch ( e ) { kb = true; } }
+			return hovering || kb;
+		};
 
 		t.querySelector( '.grs-x' ).addEventListener( 'click', function ( ev ) {
 			ev.preventDefault(); ev.stopPropagation();
 			if ( ! PREVIEW ) { try { localStorage.setItem( 'grs_dismissed', String( Date.now() ) ); } catch ( e ) {} }
 			track( 'grs_dismiss', o, seq );
-			if ( t.contains( document.activeElement ) ) {
-				if ( lastFocus && document.contains( lastFocus ) && lastFocus.focus ) { lastFocus.focus(); } else { document.activeElement.blur(); }
+			var ae = document.activeElement;
+			if ( ae && t.contains( ae ) ) {
+				// Keyboard dismiss: send focus back where it came from, without scrolling the page.
+				var kb = false;
+				try { kb = ae.matches( ':focus-visible' ); } catch ( e ) {}
+				if ( kb && lastFocus && lastFocus !== document.body && document.contains( lastFocus ) && lastFocus.focus ) {
+					try { lastFocus.focus( { preventScroll: true } ); } catch ( e ) {}
+				}
+				// Never leave focus inside a card that is about to be aria-hidden and removed.
+				if ( t.contains( document.activeElement ) ) { document.activeElement.blur(); }
 			}
-			hide( t ); stop = true;
+			hide( t ); stop = true; finish();
 		} );
 
 		// A view is counted only once the card is actually rendered: requestAnimationFrame never runs in
@@ -235,14 +304,12 @@
 		}, 600 );
 	}
 
-	// Auto-hide after `ms` — but never while the pointer is over the card or it holds keyboard focus;
+	// Auto-hide after `ms` — but never while a mouse is over the card or it holds keyboard focus;
 	// check again shortly instead. Then wait the gap and move on to the next toast.
 	function hideLater( t, ms ) {
 		setTimeout( function () {
 			if ( ! t.parentNode || ! t.classList.contains( 'grs-show' ) && t.getAttribute( 'aria-hidden' ) === 'true' ) { return; } // dismissed
-			var hovered = false;
-			try { hovered = t.matches( ':hover' ); } catch ( e ) {}
-			if ( hovered || t.contains( document.activeElement ) ) { hideLater( t, 1500 ); return; }
+			if ( t.grsHold && t.grsHold() ) { hideLater( t, 1500 ); return; }
 			hide( t );
 			setTimeout( function () { if ( ! stop ) { step(); } }, GAP );
 		}, ms );
@@ -256,13 +323,12 @@
 	}
 
 	function step() {
-		if ( stop ) { return; }
-		if ( CAP > 0 && shown >= CAP ) { return; }
-		if ( qi >= queue.length ) { if ( PREVIEW ) { qi = 0; } else { return; } }
+		if ( stop || ( CAP > 0 && shown >= CAP ) ) { finish(); return; }
+		if ( qi >= queue.length ) { if ( PREVIEW ) { qi = 0; } else { finish(); return; } }
 		if ( ! render( queue[ qi ] ) ) {
 			// Every corner would cover a control right now. Try again shortly — visitors scroll — without
 			// using up this toast or the session cap.
-			if ( ++retries <= RETRIES ) { setTimeout( step, RETRY ); }
+			if ( ++retries <= RETRIES ) { setTimeout( step, RETRY ); } else { finish(); }
 			return;
 		}
 		retries = 0;
@@ -309,7 +375,7 @@
 		window.addEventListener( 'resize', place );
 		// Re-match the page when the site switches its own light/dark theme.
 		if ( AUTO && window.MutationObserver ) {
-			var mo = new MutationObserver( function () { scheme(); } );
+			mo = new MutationObserver( schemeSoon );
 			mo.observe( document.documentElement, { attributes: true, attributeFilter: [ 'class', 'data-theme', 'style' ] } );
 			mo.observe( document.body, { attributes: true, attributeFilter: [ 'class', 'data-theme', 'style' ] } );
 		}
